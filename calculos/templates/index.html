@@ -162,8 +162,12 @@
 
         document.getElementById('btn-clear').addEventListener('click', function() {
             document.getElementById('adicional-noturno-form').reset();
-            // Resetar visibilidade do campo de carga horária
+
             toggleCargaHoraria();
+
+            // Desbloquear os campos de início e término de jornada
+            document.getElementById("inicio_jornada").disabled = false;
+            document.getElementById("fim_jornada").disabled = false;
         });
 
         // Chama a função para definir a visibilidade inicial do campo de carga horária

@@ -7,12 +7,12 @@ def index(request):
     return render(request, 'index.html')
 
 def calculo_diurno_progressivo(inicio_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao, hora_semana, dias_semana):
-    #hora trabalhada equivale a 1
-    pass
+    hora_trabalhada = 1  
+    return hora_trabalhada
 
 def calculo_diurno_regressivo(fim_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao):
-    #hora trabalhada equivale a 1
-    pass
+    hora_trabalhada = 2 
+    return hora_trabalhada
 
 def calculo_noturno_progressivo(inicio_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao):
     #hora trabalhada equivale a 1,1428571
@@ -49,23 +49,21 @@ def calcular_adicional_noturno(request):
 
             # Adicione uma verificação se a carga_horaria é None, caso seja necessário
             if carga_horaria is None:
-                # Se a carga horária não for necessária para o cálculo, você pode definir um valor padrão
-                carga_horaria = 0  # Ou qualquer valor padrão que faça sentido
+                carga_horaria = 0  # Definir valor padrão, se necessário
 
             resultado = 0
             
-            # Lógica para direcionar para a função de cálculo correta
             if tipo_calculo == 'tradicional':
-                if inicio_jornada:
-                    inicio_jornada_hora = datetime.strptime(inicio_jornada, "%H:%M").time()
-                    if inicio_jornada_hora > datetime.strptime("05:00", "%H:%M").time() and inicio_jornada_hora < datetime.strptime("15:00", "%H:%M").time():
-                        resultado = calculo_diurno_progressivo(inicio_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao, hora_semana, dias_semana)
-                    elif fim_jornada and fim_jornada > datetime.strptime("05:00", "%H:%M").time() and fim_jornada < datetime.strptime("22:00", "%H:%M").time():
-                        resultado = calculo_diurno_regressivo(fim_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao)
-                    else:
-                        return JsonResponse({"success": False, "modal_id": "tipoCalculoModal", "message": "Condições não atendidas para o cálculo."})
+                if inicio_jornada and not fim_jornada:
+                    resultado = calculo_diurno_progressivo(inicio_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao, hora_semana, dias_semana)
+                elif fim_jornada and not inicio_jornada:
+                    # Corrigindo a chamada para não passar argumentos extras
+                    resultado = calculo_diurno_regressivo(fim_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao)
 
-            # Prepare o resultado HTML
+            if tipo_calculo == 'escala':
+                print("ESCALA")
+                pass
+
             resultado_html = f"""
             <p>Dias da Semana: {dias_semana}</p>
             <p>Horas Semanais: {hora_semana}</p>
@@ -79,7 +77,11 @@ def calcular_adicional_noturno(request):
                     </tr>
                 </thead>
                 <tbody>
-                    {resultado}
+                    <tr>
+                        <td>{inicio_jornada}</td>
+                        <td>{fim_jornada}</td>
+                        <td>{resultado}</td>
+                    </tr>
                 </tbody>
             </table>
             """
