@@ -15,7 +15,7 @@ def calculo_diurno_progressivo(inicio_jornada, inicio_refeicao, fim_refeicao, mi
     
     # Cálculo da carga horária diária e armazena o valor original da carga horária
     carga_horaria_diaria = hora_semana / dias_semana
-    carga_horaria_total = carga_horaria_diaria
+    carga_horaria_total = carga_horaria_diaria + (minutos_compensacao or 0)
 
     # Calcular intervalo de refeição
     intervalo_refeicao = fim_refeicao - inicio_refeicao
@@ -66,7 +66,7 @@ def calculo_diurno_progressivo(inicio_jornada, inicio_refeicao, fim_refeicao, mi
     diferenca_carga_horaria = carga_horaria_total - horas_trabalhadas.total_seconds() / 3600
 
     # Retornar a carga horária total, horas trabalhadas e a diferença da carga horária e os períodos
-    return carga_horaria_total, horas_trabalhadas.total_seconds() / 3600, diferenca_carga_horaria, periodos_trabalhados
+    return carga_horaria_total, minutos_compensacao, horas_trabalhadas.total_seconds() / 3600, diferenca_carga_horaria, periodos_trabalhados
 
 def calculo_diurno_regressivo(fim_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao, hora_semana, dias_semana):
     # Converter strings de horário para objetos datetime
@@ -77,7 +77,7 @@ def calculo_diurno_regressivo(fim_jornada, inicio_refeicao, fim_refeicao, minuto
     
     # Cálculo da carga horária diária e armazena o valor original da carga horária
     carga_horaria_diaria = hora_semana / dias_semana
-    carga_horaria_total = carga_horaria_diaria
+    carga_horaria_total = carga_horaria_diaria + (minutos_compensacao or 0)
 
     # Calcular intervalo de refeição
     intervalo_refeicao = fim_refeicao - inicio_refeicao
@@ -134,13 +134,13 @@ def calculo_diurno_regressivo(fim_jornada, inicio_refeicao, fim_refeicao, minuto
     # Calcular a diferença de carga horária após as subtrações
     diferenca_carga_horaria = carga_horaria_total - horas_trabalhadas.total_seconds() / 3600
 
-    return carga_horaria_total, horas_trabalhadas.total_seconds() / 3600, diferenca_carga_horaria, periodos_trabalhados
+    return carga_horaria_total, minutos_compensacao, horas_trabalhadas.total_seconds() / 3600, diferenca_carga_horaria, periodos_trabalhados
 
-def calculo_noturno_progressivo(inicio_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao):
+def calculo_noturno_progressivo(inicio_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao, hora_semana, dias_semana):
     #hora trabalhada equivale a 1,1428571
     pass
 
-def calculo_noturno_regressivo(fim_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao):
+def calculo_noturno_regressivo(fim_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao, hora_semana, dias_semana):
     #hora trabalhada equivale a 1,1428571
     pass
 
@@ -171,7 +171,7 @@ def calcular_adicional_noturno(request):
             fim_jornada = data.get('fim_jornada') or None
             inicio_refeicao = data.get('inicio_refeicao')
             fim_refeicao = data.get('fim_refeicao')
-            minutos_compensacao = converter_para_float(data.get('minutos_compensacao')) or None
+            minutos_compensacao = converter_para_float(data.get('minutos_compensacao')) or 0
             carga_horaria = converter_para_float(data.get('carga_horaria'))
 
             if carga_horaria is None:
@@ -190,7 +190,28 @@ def calcular_adicional_noturno(request):
                 elif fim_jornada and not inicio_jornada:
                     resultado = calculo_escala_regressivo(fim_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao, hora_semana, dias_semana)
 
-            carga_horaria_total, horas_trabalhadas, diferenca_carga_horaria, periodos_trabalhados = resultado
+            carga_horaria_total, minutos_compensacao, horas_trabalhadas, diferenca_carga_horaria, periodos_trabalhados = resultado
+
+            def ajustar_carga_horaria(carga_horaria):
+                # Verificar se a carga horária é um número inteiro ou float
+                if isinstance(carga_horaria, float):
+                    # Separar a parte inteira e a parte decimal
+                    parte_inteira = int(carga_horaria)
+                    parte_decimal = carga_horaria - parte_inteira
+                    
+                    # Multiplicar a parte decimal por 0.60 e ajustar
+                    parte_decimal_ajustada = round(parte_decimal * 0.60, 2)
+                    
+                    # Concatenar a parte inteira com a parte decimal ajustada
+                    carga_horaria_ajustada = parte_inteira + parte_decimal_ajustada
+                    return carga_horaria_ajustada
+                else:
+                    # Se for um número inteiro, retorna o valor original
+                    return carga_horaria
+
+            horas = int(hora_semana)  # Parte inteira
+            minutos = int((hora_semana - horas) * 60)  # Parte decimal convertida para minutos
+            horas_formatadas = f"{horas}h{minutos:02d}"  # Formato 'XhYY'
 
             tabela_html = """
             <table class="table table-striped table-bordered">
@@ -217,19 +238,15 @@ def calcular_adicional_noturno(request):
                         """
 
             resultado_html = f"""
-                        <div class="container">
-                            <div class="row">
-                                <div class="col-md-12">
-                                    <p><strong>Dias da Semana:</strong> {dias_semana}</p>
-                                    <p><strong>Horas Semanais:</strong> {hora_semana}</p>
-                                    <p><strong>Carga Horária Diária:</strong> {carga_horaria_total}</p>
-                                    <p><strong>Horas Trabalhadas:</strong> {horas_trabalhadas}</p>
-                                    <p><strong>Diferença de Carga Horária:</strong> {diferenca_carga_horaria}</p>
-                                    {tabela_html}
-                                </div>
-                            </div>
-                        </div>
-                        """
+            <div class="container">
+                <h5>Resultado do Cálculo</h5>
+                <p>Carga Horária Diária:<strong> {ajustar_carga_horaria(carga_horaria_total):.2f} </strong> horas</p>
+                <p>Horas Trabalhadas:<strong> {ajustar_carga_horaria(horas_trabalhadas):.2f} </strong> horas</p>
+                <p>Diferença de Carga Horária:<strong> {diferenca_carga_horaria:.2f} </strong> horas</p>
+                <p>Carga Horária Total:<strong> {horas_formatadas} </strong></p>
+                {tabela_html}
+            </div>
+            """
 
             return JsonResponse({"success": True, "resultado_html": resultado_html})
 
