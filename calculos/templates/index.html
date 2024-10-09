@@ -153,12 +153,30 @@
         });
 
         function toggleCargaHoraria() {
-            const cargaHorariaField = document.getElementById('carga-horaria-field');
             const isEscala = document.querySelector('input[name="tipo_calculo"]:checked').value === 'escala';
+            const diasSemanaField = document.getElementById('dias_semana');
+            const horaSemanaField = document.getElementById('hora_semana');
+            const cargaHorariaField = document.getElementById('carga-horaria-field');
 
-            // Mostrar ou esconder o campo de carga horária baseado na opção selecionada
-            cargaHorariaField.style.display = isEscala ? 'block' : 'none';
+            // Mostrar/ocultar campos de "Dias da Semana" e "Total de Horas Semanais"
+            if (isEscala) {
+                diasSemanaField.closest('.form-group').style.display = 'none';
+                horaSemanaField.closest('.form-group').style.display = 'none';
+                cargaHorariaField.style.display = 'block';
+            } else {
+                diasSemanaField.closest('.form-group').style.display = 'block';
+                horaSemanaField.closest('.form-group').style.display = 'block';
+                cargaHorariaField.style.display = 'none';
+            }
         }
+
+        // Chamar toggleCargaHoraria ao alterar o tipo de cálculo
+        document.querySelectorAll('input[name="tipo_calculo"]').forEach(radio => {
+            radio.addEventListener('change', toggleCargaHoraria);
+        });
+
+        // Executar ao carregar a página para garantir o estado correto
+        toggleCargaHoraria();
 
         document.getElementById('btn-clear').addEventListener('click', function() {
             document.getElementById('adicional-noturno-form').reset();
@@ -169,10 +187,5 @@
             document.getElementById("inicio_jornada").disabled = false;
             document.getElementById("fim_jornada").disabled = false;
         });
-
-        // Chama a função para definir a visibilidade inicial do campo de carga horária
-        toggleCargaHoraria();
-
-        
     </script>
 {% endblock %}

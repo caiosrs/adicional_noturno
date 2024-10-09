@@ -5,7 +5,6 @@ document.addEventListener('DOMContentLoaded', function() {
     form.addEventListener('submit', function(event) {
         event.preventDefault();  // Impedir o envio padrão do formulário
 
-        // Captura os dados do formulário
         const tipoCalculo = document.querySelector('input[name="tipo_calculo"]:checked').value;
         const diasSemana = document.getElementById('dias_semana').value;
         const horaSemana = document.getElementById('hora_semana').value;
@@ -14,17 +13,19 @@ document.addEventListener('DOMContentLoaded', function() {
         const inicioRefeicao = document.getElementById('inicio_refeicao').value;
         const fimRefeicao = document.getElementById('fim_refeicao').value;
         const minutosCompensacao = document.getElementById('minutos_compensacao').value;
-        const cargaHoraria = document.getElementById('carga_horaria').value || null;  // Valor opcional
+        const cargaHoraria = document.getElementById('carga_horaria').value || null;
 
         // Verificações de validação
-        if (!diasSemana || diasSemana < 1 || diasSemana > 7) {
-            alert('O valor de "Dias da Semana" deve ser entre 1 e 7.');
-            return;
-        }
+        if (tipoCalculo === 'tradicional') {
+            if (!diasSemana || diasSemana < 1 || diasSemana > 7) {
+                alert('O valor de "Dias da Semana" deve ser entre 1 e 7.');
+                return;
+            }
 
-        if (!horaSemana || horaSemana == 0) {
-            alert('o "Total de Horas Semanais" não pode ser 0.');
-            return;
+            if (!horaSemana || horaSemana == 0) {
+                alert('O "Total de Horas Semanais" não pode ser 0.');
+                return;
+            }
         }
 
         if (!inicioJornada && !fimJornada) {
@@ -42,7 +43,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Verificação adicional se "Escala" for selecionado
         if (tipoCalculo === 'escala' && !cargaHoraria) {
             alert('O campo "Carga Horária" não pode ser deixado vazio para o tipo de cálculo "Escala".');
             return;
