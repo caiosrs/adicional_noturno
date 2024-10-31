@@ -152,8 +152,28 @@
             toggleJornadaFields();
         });
 
+        // Função para limpar todos os campos
+        function clearFields() {
+            document.getElementById('dias_semana').value = '';
+            document.getElementById('hora_semana').value = '';
+            document.getElementById('inicio_jornada').value = '';
+            document.getElementById('fim_jornada').value = '';
+            document.getElementById('inicio_refeicao').value = '';
+            document.getElementById('fim_refeicao').value = '';
+            document.getElementById('minutos_compensacao').value = '';
+            document.getElementById('carga-horaria-field').value = '';
+
+            document.getElementById("inicio_jornada").disabled = false;
+            document.getElementById("fim_jornada").disabled = false;
+        }
+
+        // Função para alternar a visibilidade dos campos com base no tipo de cálculo selecionado
         function toggleCargaHoraria() {
             const isEscala = document.querySelector('input[name="tipo_calculo"]:checked').value === 'escala';
+            
+            // Limpa os campos antes de mostrar/ocultar
+            clearFields();
+
             const diasSemanaField = document.getElementById('dias_semana');
             const horaSemanaField = document.getElementById('hora_semana');
             const cargaHorariaField = document.getElementById('carga-horaria-field');
