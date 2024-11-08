@@ -1,6 +1,30 @@
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('adicional-noturno-form');
     const resultadoModal = new bootstrap.Modal(document.getElementById('resultadoModal'));
+    const periodoTrabalhoModal = new bootstrap.Modal(document.getElementById('periodoTrabalhoModal')); // Modal de seleção do tipo de cálculo
+    const periodoTrabalhoOpcoes = document.querySelectorAll('input[name="opcao_noturno"]'); // Opções CLT e Súmula
+    let periodoTrabalhoEscolhida = null;
+
+    // Função para verificar se a jornada está no intervalo do adicional noturno
+    function isAdicionalNoturno(inicioJornada, fimJornada) {
+        let horarioVerificado = false;
+
+        if (inicioJornada) {
+            const horaInicio = parseInt(inicioJornada.split(":")[0], 10);
+            if (horaInicio >= 22 || horaInicio < 5) {
+                horarioVerificado = true;
+            }
+        }
+
+        if (fimJornada && !horarioVerificado) {
+            const horaFim = parseInt(fimJornada.split(":")[0], 10);
+            if (horaFim >= 22 || horaFim < 5) {
+                horarioVerificado = true;
+            }
+        }
+
+        return horarioVerificado;
+    }
 
     form.addEventListener('submit', function(event) {
         event.preventDefault();  // Impedir o envio padrão do formulário
@@ -15,81 +39,100 @@ document.addEventListener('DOMContentLoaded', function() {
         const minutosCompensacao = document.getElementById('minutos_compensacao').value;
         const cargaHoraria = document.getElementById('carga_horaria').value || null;
 
-        // Verificações de validação
-        if (tipoCalculo === 'tradicional') {
-            if (!diasSemana || diasSemana < 1 || diasSemana > 7) {
-                alert('O valor de "Dias da Semana" deve ser entre 1 e 7.');
+        // Verificação se a jornada está no horário noturno
+        if (isAdicionalNoturno(inicioJornada, fimJornada)) {
+            periodoTrabalhoModal.show(); // Mostrar a modal de seleção
+            document.getElementById('btn-calcular').addEventListener('click', function() {
+                periodoTrabalhoOpcoes.forEach(function(opcao) {
+                    if (opcao.checked) {
+                        periodoTrabalhoEscolhida = opcao.value;
+                    }
+                });
+
+                // Continuar apenas se uma opção for selecionada
+                if (!periodoTrabalhoEscolhida) {
+                    alert('Por favor, selecione uma opção de período de trabalho.');
+                    return;
+                }
+                periodoTrabalhoModal.hide();
+                enviarFormulario();
+            });
+        } else {
+            periodoTrabalhoEscolhida = 'none';
+            enviarFormulario();
+        }
+
+        function enviarFormulario() {
+            // Verificações de validação
+            if (tipoCalculo === 'tradicional') {
+                if (!diasSemana || diasSemana < 1 || diasSemana > 7) {
+                    alert('O valor de "Dias da Semana" deve ser entre 1 e 7.');
+                    return;
+                }
+
+                if (!horaSemana || horaSemana == 0) {
+                    alert('O "Total de Horas Semanais" não pode ser 0.');
+                    return;
+                }
+            }
+
+            if (!inicioJornada && !fimJornada) {
+                alert('Preencha ao menos um dos campos: "Início da Jornada de Trabalho" ou "Término da Jornada de Trabalho".');
                 return;
             }
 
-            if (!horaSemana || horaSemana == 0) {
-                alert('O "Total de Horas Semanais" não pode ser 0.');
+            if (!inicioRefeicao) {
+                alert('O campo "Início do Intervalo de Refeição" não pode ser deixado vazio.');
                 return;
             }
-        }
 
-        if (!inicioJornada && !fimJornada) {
-            alert('Preencha ao menos um dos campos: "Início da Jornada de Trabalho" ou "Término da Jornada de Trabalho".');
-            return;
-        }
+            if (!fimRefeicao) {
+                alert('O campo "Término do Intervalo de Refeição" não pode ser deixado vazio.');
+                return;
+            }
 
-        if (!inicioRefeicao) {
-            alert('O campo "Início do Intervalo de Refeição" não pode ser deixado vazio.');
-            return;
-        }
+            if (tipoCalculo === 'escala' && !cargaHoraria) {
+                alert('O campo "Carga Horária" não pode ser deixado vazio para o tipo de cálculo "Escala".');
+                return;
+            }
 
-        if (!fimRefeicao) {
-            alert('O campo "Término do Intervalo de Refeição" não pode ser deixado vazio.');
-            return;
-        }
+            const cargaHorariaFloat = cargaHoraria ? cargaHoraria : null;  // Valor opcional
 
-        if (tipoCalculo === 'escala' && !cargaHoraria) {
-            alert('O campo "Carga Horária" não pode ser deixado vazio para o tipo de cálculo "Escala".');
-            return;
-        }
+            // Dados para envio
+            const formData = {
+                tipo_calculo: tipoCalculo,
+                periodo_trabalhado: periodoTrabalhoEscolhida,
+                dias_semana: diasSemana,
+                hora_semana: horaSemana,
+                inicio_jornada: inicioJornada,
+                fim_jornada: fimJornada,
+                inicio_refeicao: inicioRefeicao,
+                fim_refeicao: fimRefeicao,
+                minutos_compensacao: minutosCompensacao,
+                carga_horaria: cargaHorariaFloat  // Valor opcional
+            };
 
-        const cargaHorariaFloat = cargaHoraria ? cargaHoraria : null;  // Valor opcional
-        
-        // Dados para envio
-        const formData = {
-            tipo_calculo: tipoCalculo,
-            dias_semana: diasSemana,
-            hora_semana: horaSemana,
-            inicio_jornada: inicioJornada,
-            fim_jornada: fimJornada,
-            inicio_refeicao: inicioRefeicao,
-            fim_refeicao: fimRefeicao,
-            minutos_compensacao: minutosCompensacao,
-            carga_horaria: cargaHorariaFloat  // Valor opcional
-        };        
-
-        fetch(form.action, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            },
-            body: JSON.stringify(formData)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Exibir o resultado no modal
-                document.querySelector('.modal-resultados').innerHTML = data.resultado_html;
-                resultadoModal.show();  // Mostrar o modal com os resultados
-            } else {
-                if (data.modal_id) {
-                    // Mostrar o modal indicado na resposta
-                    const tipoCalculoModal = new bootstrap.Modal(document.getElementById(data.modal_id));
-                    tipoCalculoModal.show();
+            fetch(form.action, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.querySelector('.modal-resultados').innerHTML = data.resultado_html;
+                    resultadoModal.show();  // Mostrar o modal com os resultados
                 } else {
                     alert('Erro: ' + data.error);
                 }
-            }
-        })
-        .catch(error => {
-            console.error('Erro ao enviar a requisição:', error);
-            alert('Ocorreu um erro ao processar o cálculo.');
-        });        
+            })
+            .catch(error => {
+                console.error('Erro ao enviar a requisição:', error);
+                alert('Ocorreu um erro ao processar o cálculo.');
+            });
+        }
     });
 });
