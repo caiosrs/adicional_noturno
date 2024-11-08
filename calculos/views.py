@@ -6,127 +6,145 @@ import json
 def index(request):
     return render(request, 'index.html')
 
-def calculo_diurno_progressivo(inicio_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao, hora_semana, dias_semana):
+def calculo_diurno_progressivo(inicio_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao, hora_semana, dias_semana, periodo_trabalhado):
     # Converter strings de horário para objetos datetime
     formato_hora = "%H:%M"
     inicio_jornada = datetime.strptime(inicio_jornada, formato_hora)
     inicio_refeicao = datetime.strptime(inicio_refeicao, formato_hora)
     fim_refeicao = datetime.strptime(fim_refeicao, formato_hora)
+    periodo_trabalho_opcao = periodo_trabalhado
     
-    # Cálculo da carga horária diária e armazena o valor original da carga horária
-    carga_horaria_diaria = hora_semana / dias_semana
-    carga_horaria_total = carga_horaria_diaria + (minutos_compensacao or 0)
+    # Cálculo da carga horária semanal total com minutos de compensação incluídos
+    carga_horaria_total_semana = hora_semana + (minutos_compensacao or 0)  # Total semanal incluindo compensação
+    carga_horaria_diaria = carga_horaria_total_semana / dias_semana  # Carga diária ajustada
 
     # Calcular intervalo de refeição
     intervalo_refeicao = fim_refeicao - inicio_refeicao
     
     # Lista para armazenar as horas trabalhadas e intervalo de refeição
-    periodos_trabalhados = []
+    horarios_trabalhados = []
 
     hora_atual = inicio_jornada
     horas_trabalhadas = timedelta(hours=0)
 
+     # Ajustar o valor de "hours" com base em "periodo_trabalho_opcao"
+    if periodo_trabalho_opcao == "none":
+        hours = 1
+    elif periodo_trabalho_opcao in ["clt", "sumula"]:
+        hours = 1.1428571
+    else:
+        raise ValueError("Opção de cálculo inválida. Escolha 'none', 'clt' ou 'sumula'.")
+
     # Somar horas trabalhadas até o intervalo de refeição
     while horas_trabalhadas.total_seconds() / 3600 < carga_horaria_diaria and hora_atual < inicio_refeicao:
         hora_entrada = hora_atual
-        hora_saida = hora_atual + timedelta(hours=1)
+        hora_saida = hora_atual + timedelta(hours=hours)
         
         # Verificar se a próxima hora coincide com o intervalo de refeição
         if hora_saida >= inicio_refeicao:
-            periodos_trabalhados.append((hora_entrada.strftime(formato_hora), inicio_refeicao.strftime(formato_hora), "1,00"))
-            horas_trabalhadas += timedelta(hours=1)
+            horarios_trabalhados.append((hora_entrada.strftime(formato_hora), inicio_refeicao.strftime(formato_hora), "1,00"))
+            horas_trabalhadas += timedelta(hours=hours)
             break
         
-        periodos_trabalhados.append((hora_entrada.strftime(formato_hora), hora_saida.strftime(formato_hora), "1,00"))
+        horarios_trabalhados.append((hora_entrada.strftime(formato_hora), hora_saida.strftime(formato_hora), "1,00"))
         hora_atual = hora_saida
-        horas_trabalhadas += timedelta(hours=1)
+        horas_trabalhadas += timedelta(hours=hours)
     
     # Adicionar o intervalo de refeição
-    periodos_trabalhados.append((inicio_refeicao.strftime(formato_hora), fim_refeicao.strftime(formato_hora), "0,00"))
+    horarios_trabalhados.append((inicio_refeicao.strftime(formato_hora), fim_refeicao.strftime(formato_hora), "0,00"))
     hora_atual = fim_refeicao
 
-    # Continuar somando o restante das horas até atingir a carga horária diária
-    while horas_trabalhadas.total_seconds() / 3600 < carga_horaria_total:
+    # Continuar somando o restante das horas até atingir a carga horária diária ajustada
+    while horas_trabalhadas.total_seconds() / 3600 < carga_horaria_diaria:
         hora_entrada = hora_atual
-        hora_saida = hora_atual + timedelta(hours=1)
+        hora_saida = hora_atual + timedelta(hours=hours)
         
         # Verificar se ainda falta menos de uma hora
-        if (horas_trabalhadas.total_seconds() / 3600 + 1) > carga_horaria_total:
-            minutos_restantes = carga_horaria_total - horas_trabalhadas.total_seconds() / 3600
+        if (horas_trabalhadas.total_seconds() / 3600 + 1) > carga_horaria_diaria:
+            minutos_restantes = carga_horaria_diaria - horas_trabalhadas.total_seconds() / 3600
             hora_saida = hora_entrada + timedelta(minutes=minutos_restantes * 60)
-            periodos_trabalhados.append((hora_entrada.strftime(formato_hora), hora_saida.strftime(formato_hora), f"{minutos_restantes:.2f}"))
+            horarios_trabalhados.append((hora_entrada.strftime(formato_hora), hora_saida.strftime(formato_hora), f"{minutos_restantes:.2f}"))
             horas_trabalhadas += timedelta(minutes=minutos_restantes * 60)
             break
         
-        periodos_trabalhados.append((hora_entrada.strftime(formato_hora), hora_saida.strftime(formato_hora), "1,00"))
+        horarios_trabalhados.append((hora_entrada.strftime(formato_hora), hora_saida.strftime(formato_hora), "1,00"))
         hora_atual = hora_saida
-        horas_trabalhadas += timedelta(hours=1)
+        horas_trabalhadas += timedelta(hours=hours)
 
     # Calcular diferença de carga horária após as subtrações
-    diferenca_carga_horaria = carga_horaria_total - horas_trabalhadas.total_seconds() / 3600
+    diferenca_carga_horaria = carga_horaria_diaria - horas_trabalhadas.total_seconds() / 3600
+    
+    # Retornar a carga horária total semanal, carga horária diária ajustada, horas trabalhadas e a diferença
+    return carga_horaria_total_semana, carga_horaria_diaria, horas_trabalhadas.total_seconds() / 3600, diferenca_carga_horaria, horarios_trabalhados
 
-    # Retornar a carga horária total, horas trabalhadas e a diferença da carga horária e os períodos
-    return carga_horaria_total, minutos_compensacao, horas_trabalhadas.total_seconds() / 3600, diferenca_carga_horaria, periodos_trabalhados
-
-def calculo_diurno_regressivo(fim_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao, hora_semana, dias_semana):
+def calculo_diurno_regressivo(fim_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao, hora_semana, dias_semana, periodo_trabalhado):
     # Converter strings de horário para objetos datetime
     formato_hora = "%H:%M"
     fim_jornada = datetime.strptime(fim_jornada, formato_hora)
     inicio_refeicao = datetime.strptime(inicio_refeicao, formato_hora)
     fim_refeicao = datetime.strptime(fim_refeicao, formato_hora)
+    periodo_trabalho_opcao = periodo_trabalhado
     
-    # Cálculo da carga horária diária e armazena o valor original da carga horária
+    # Cálculo da carga horária diária e total
     carga_horaria_diaria = hora_semana / dias_semana
-    carga_horaria_total = carga_horaria_diaria + (minutos_compensacao or 0)
+    carga_horaria_total = carga_horaria_diaria + (minutos_compensacao / dias_semana) if minutos_compensacao else carga_horaria_diaria
 
     # Calcular intervalo de refeição
     intervalo_refeicao = fim_refeicao - inicio_refeicao
 
     # Lista para armazenar os períodos trabalhados
-    periodos_trabalhados = []
+    horarios_trabalhados = []
 
     # Começar pelo fim da jornada
     hora_atual = fim_jornada
     horas_trabalhadas = timedelta(hours=0)
 
+    # Ajustar o valor de "hours" com base em "periodo_trabalho_opcao"
+    if periodo_trabalho_opcao == "none":
+        hours = 1
+    elif periodo_trabalho_opcao in ["clt", "sumula"]:
+        hours = 1.1428571
+    else:
+        raise ValueError("Opção de cálculo inválida. Escolha 'none', 'clt' ou 'sumula'.")
+
     # Subtrair horas trabalhadas após o intervalo de refeição
     while horas_trabalhadas.total_seconds() / 3600 < carga_horaria_diaria and hora_atual > fim_refeicao:
         hora_saida = hora_atual
-        hora_entrada = hora_atual - timedelta(hours=1)
+        hora_entrada = hora_atual - timedelta(hours=hours)
         
         # Verificar se a próxima hora coincide com o fim do intervalo de refeição
         if hora_entrada <= fim_refeicao:
-            periodos_trabalhados.append((fim_refeicao.strftime(formato_hora), hora_saida.strftime(formato_hora), "1,00"))
-            horas_trabalhadas += timedelta(hours=1)
+            horarios_trabalhados.append((fim_refeicao.strftime(formato_hora), hora_saida.strftime(formato_hora), "1,00"))
+            horas_trabalhadas += timedelta(hours=hours)
             break
         
-        periodos_trabalhados.append((hora_entrada.strftime(formato_hora), hora_saida.strftime(formato_hora), "1,00"))
+        horarios_trabalhados.append((hora_entrada.strftime(formato_hora), hora_saida.strftime(formato_hora), "1,00"))
         hora_atual = hora_entrada
-        horas_trabalhadas += timedelta(hours=1)
+        horas_trabalhadas += timedelta(hours=hours)
 
     # Adicionar o intervalo de refeição
-    periodos_trabalhados.append((inicio_refeicao.strftime(formato_hora), fim_refeicao.strftime(formato_hora), "0,00"))
+    horarios_trabalhados.append((inicio_refeicao.strftime(formato_hora), fim_refeicao.strftime(formato_hora), "0,00"))
     hora_atual = inicio_refeicao
 
-    # Continuar subtraindo o restante das horas até atingir a carga horária diária
+    # Continuar subtraindo o restante das horas até atingir a carga horária total ajustada
     while horas_trabalhadas.total_seconds() / 3600 < carga_horaria_total:
         hora_saida = hora_atual
-        hora_entrada = hora_atual - timedelta(hours=1)
+        hora_entrada = hora_atual - timedelta(hours=hours)
         
         # Verificar se ainda falta menos de uma hora
         if (horas_trabalhadas.total_seconds() / 3600 + 1) > carga_horaria_total:
             minutos_restantes = carga_horaria_total - horas_trabalhadas.total_seconds() / 3600
             hora_entrada = hora_saida - timedelta(minutes=minutos_restantes * 60)
-            periodos_trabalhados.append((hora_entrada.strftime(formato_hora), hora_saida.strftime(formato_hora), f"{minutos_restantes:.2f}"))
+            horarios_trabalhados.append((hora_entrada.strftime(formato_hora), hora_saida.strftime(formato_hora), f"{minutos_restantes:.2f}"))
             horas_trabalhadas += timedelta(minutes=minutos_restantes * 60)
             break
         
-        periodos_trabalhados.append((hora_entrada.strftime(formato_hora), hora_saida.strftime(formato_hora), "1,00"))
+        horarios_trabalhados.append((hora_entrada.strftime(formato_hora), hora_saida.strftime(formato_hora), "1,00"))
         hora_atual = hora_entrada
-        horas_trabalhadas += timedelta(hours=1)
+        horas_trabalhadas += timedelta(hours=hours)
 
-    # Ordenar os períodos trabalhados pelo horário de entrada (hora_entrada)
-    periodos_trabalhados.sort(key=lambda periodo: datetime.strptime(periodo[0], formato_hora))
+    # Ordenar os períodos trabalhados pelo horário de entrada
+    horarios_trabalhados.sort(key=lambda periodo: datetime.strptime(periodo[0], formato_hora))
 
     # Calcular o horário de início da jornada
     inicio_jornada = hora_atual.strftime(formato_hora)
@@ -134,7 +152,7 @@ def calculo_diurno_regressivo(fim_jornada, inicio_refeicao, fim_refeicao, minuto
     # Calcular a diferença de carga horária após as subtrações
     diferenca_carga_horaria = carga_horaria_total - horas_trabalhadas.total_seconds() / 3600
 
-    return carga_horaria_total, minutos_compensacao, horas_trabalhadas.total_seconds() / 3600, diferenca_carga_horaria, periodos_trabalhados
+    return carga_horaria_total, minutos_compensacao, horas_trabalhadas.total_seconds() / 3600, diferenca_carga_horaria, horarios_trabalhados
 
 def calculo_noturno_progressivo(inicio_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao, hora_semana, dias_semana):
     #hora trabalhada equivale a 1,1428571
@@ -145,11 +163,11 @@ def calculo_noturno_regressivo(fim_jornada, inicio_refeicao, fim_refeicao, minut
     pass
 
 def calculo_escala_progressivo():
-    #return JsonResponse({"success": False, "modal_id": "tipoCalculoModal"})
+    #return JsonResponse({"success": False, "modal_id": "periodoTrabalhadoModal"})
     pass
 
 def calculo_escala_regressivo():
-    #return JsonResponse({"success": False, "modal_id": "tipoCalculoModal"})
+    #return JsonResponse({"success": False, "modal_id": "periodoTrabalhadoModal"})
     pass
 
 def calcular_adicional_noturno(request):
@@ -165,6 +183,7 @@ def calcular_adicional_noturno(request):
                     return None
 
             tipo_calculo = data.get('tipo_calculo')
+            periodo_trabalhado = data.get('periodo_trabalhado') or None
             dias_semana = int(data.get('dias_semana'))
             hora_semana = converter_para_float(data.get('hora_semana'))
             inicio_jornada = data.get('inicio_jornada') or None
@@ -181,16 +200,16 @@ def calcular_adicional_noturno(request):
             
             if tipo_calculo == 'tradicional':
                 if inicio_jornada and not fim_jornada:
-                    resultado = calculo_diurno_progressivo(inicio_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao, hora_semana, dias_semana)
+                    resultado = calculo_diurno_progressivo(inicio_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao, hora_semana, dias_semana, periodo_trabalhado)
                 elif fim_jornada and not inicio_jornada:
-                    resultado = calculo_diurno_regressivo(fim_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao, hora_semana, dias_semana)
+                    resultado = calculo_diurno_regressivo(fim_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao, hora_semana, dias_semana, periodo_trabalhado)
             else:
                 if inicio_jornada and not fim_jornada:
-                    resultado = calculo_escala_progressivo(inicio_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao, hora_semana, dias_semana)
+                    resultado = calculo_escala_progressivo(inicio_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao, hora_semana, dias_semana, periodo_trabalhado)
                 elif fim_jornada and not inicio_jornada:
-                    resultado = calculo_escala_regressivo(fim_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao, hora_semana, dias_semana)
+                    resultado = calculo_escala_regressivo(fim_jornada, inicio_refeicao, fim_refeicao, minutos_compensacao, hora_semana, dias_semana, periodo_trabalhado)
 
-            carga_horaria_total, minutos_compensacao, horas_trabalhadas, diferenca_carga_horaria, periodos_trabalhados = resultado
+            carga_horaria_total, minutos_compensacao, horas_trabalhadas, diferenca_carga_horaria, horarios_trabalhados = resultado
 
             def ajustar_carga_horaria(carga_horaria):
                 # Verificar se a carga horária é um número inteiro ou float
@@ -224,7 +243,7 @@ def calcular_adicional_noturno(request):
                 </thead>
                 <tbody>
             """
-            for entrada, saida, hora_trabalhada in periodos_trabalhados:
+            for entrada, saida, hora_trabalhada in horarios_trabalhados:
                 tabela_html += f"""
                             <tr>
                                 <td>{entrada}</td>
@@ -236,14 +255,20 @@ def calcular_adicional_noturno(request):
                             </tbody>
                         </table>
                         """
+            horas_trabalhadas = ajustar_carga_horaria(horas_trabalhadas)
+            horas_trabalhadas = f"{horas_trabalhadas:.2f}".replace(".", "h")
+
+            diferenca_carga_horaria = ajustar_carga_horaria(diferenca_carga_horaria)
+            diferenca_carga_horaria = f"{diferenca_carga_horaria:.2f}".replace(".", "h")
+
+            carga_horaria_total = ajustar_carga_horaria(carga_horaria_total)
+            carga_horaria_total = f"{carga_horaria_total:.2f}".replace(".", "h")
 
             resultado_html = f"""
             <div class="container">
-                <h5>Resultado do Cálculo</h5>
-                <p>Carga Horária Diária:<strong> {ajustar_carga_horaria(carga_horaria_total):.2f} </strong> horas</p>
-                <p>Horas Trabalhadas:<strong> {ajustar_carga_horaria(horas_trabalhadas):.2f} </strong> horas</p>
-                <p>Diferença de Carga Horária:<strong> {diferenca_carga_horaria:.2f} </strong> horas</p>
-                <p>Carga Horária Total:<strong> {horas_formatadas} </strong></p>
+                <p>Horas Trabalhadas:<strong> {horas_trabalhadas} </strong> horas</p>
+                <p>Diferença de Carga Horária:<strong> {diferenca_carga_horaria} </strong> horas</p>
+                <p>Carga Horária Total:<strong> {carga_horaria_total} </strong></p>
                 {tabela_html}
             </div>
             """
