@@ -30,13 +30,13 @@ document.addEventListener('DOMContentLoaded', function() {
         event.preventDefault();  // Impedir o envio padrão do formulário
 
         const tipoCalculo = document.querySelector('input[name="tipo_calculo"]:checked').value;
-        const diasSemana = document.getElementById('dias_semana').value;
-        const horaSemana = document.getElementById('hora_semana').value;
+        const diasSemana = document.getElementById('dias_semana').value || 0;
+        const horaSemana = document.getElementById('hora_semana').value || 0;
         const inicioJornada = document.getElementById('inicio_jornada').value;
         const fimJornada = document.getElementById('fim_jornada').value;
         const inicioRefeicao = document.getElementById('inicio_refeicao').value;
         const fimRefeicao = document.getElementById('fim_refeicao').value;
-        const minutosCompensacao = document.getElementById('minutos_compensacao').value;
+        const minutosCompensacao = document.getElementById('minutos_compensacao').value.trim();
         const cargaHoraria = document.getElementById('carga_horaria').value || null;
 
         // Verificação se a jornada está no horário noturno
@@ -95,7 +95,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('O campo "Carga Horária" não pode ser deixado vazio para o tipo de cálculo "Escala".');
                 return;
             }
-
             const cargaHorariaFloat = cargaHoraria ? cargaHoraria : null;  // Valor opcional
 
             // Dados para envio
@@ -108,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 fim_jornada: fimJornada,
                 inicio_refeicao: inicioRefeicao,
                 fim_refeicao: fimRefeicao,
-                minutos_compensacao: minutosCompensacao,
+                minutos_compensacao: minutosCompensacao !== "" ? minutosCompensacao : "0",
                 carga_horaria: cargaHorariaFloat  // Valor opcional
             };
 
